@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String
+  groupId      Int?
+  isExpelled   Boolean  @default(false)
+  isNew        Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  group           Group?          @relation(fields: [groupId], references: [id])
+  gradesGiven     JournalEntry[]  @relation("TeacherGrades")
+  grades          JournalEntry[]  @relation("StudentGrades")
+  submissions     LabSubmission[]
+  teamMemberships LabTeamMember[]
+  groupSubjects   GroupSubject[]
+}
+
+model Group {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  students      User[]
+  groupSubjects GroupSubject[]
+}
+
+model Subject {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  groupSubjects GroupSubject[]
+}
+
+model GroupSubject {
+  id        Int @id @default(autoincrement())
+  groupId   Int
+  subjectId Int
+  teacherId Int
+
+  group         Group          @relation(fields: [groupId], references: [id])
+  subject       Subject        @relation(fields: [subjectId], references: [id])
+  teacher       User           @relation(fields: [teacherId], references: [id])
+  scheduleSlots ScheduleSlot[]
+  labWorks      LabWork[]
+
+  @@unique([groupId, subjectId])
+}
+
+model ScheduleSlot {
+  id             Int    @id @default(autoincrement())
+  groupSubjectId Int
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  room           String @default("")
+
+  groupSubject GroupSubject @relation(fields: [groupSubjectId], references: [id])
+  lessons      Lesson[]
+}
+
+model Lesson {
+  id             Int      @id @default(autoincrement())
+  scheduleSlotId Int
+  date           DateTime
+  topic          String?
+  type           String   @default("LECTURE")
+
+  scheduleSlot   ScheduleSlot   @relation(fields: [scheduleSlotId], references: [id])
+  journalEntries JournalEntry[]
+}
+
+model JournalEntry {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int
+  studentId Int
+  teacherId Int
+  grade     Int?
+  status    String   @default("PRESENT")
+  createdAt DateTime @default(now())
+
+  lesson  Lesson @relation(fields: [lessonId], references: [id])
+  student User   @relation("StudentGrades", fields: [studentId], references: [id])
+  teacher User   @relation("TeacherGrades", fields: [teacherId], references: [id])
+
+  @@unique([lessonId, studentId])
+}
+
+model LabWork {
+  id             Int       @id @default(autoincrement())
+  groupSubjectId Int
+  title          String
+  description    String?
+  dueDate        DateTime?
+  isTeam         Boolean   @default(false)
+  materialsUrl   String?
+  createdAt      DateTime  @default(now())
+
+  groupSubject GroupSubject    @relation(fields: [groupSubjectId], references: [id])
+  submissions  LabSubmission[]
+  teams        LabTeam[]
+}
+
+model LabSubmission {
+  id          Int       @id @default(autoincrement())
+  labWorkId   Int
+  studentId   Int
+  fileUrl     String?
+  submittedAt DateTime  @default(now())
+  grade       Int?
+  comment     String?
+  reviewedAt  DateTime?
+
+  labWork LabWork @relation(fields: [labWorkId], references: [id])
+  student User    @relation(fields: [studentId], references: [id])
+
+  @@unique([labWorkId, studentId])
+}
+
+model LabTeam {
+  id        Int @id @default(autoincrement())
+  labWorkId Int
+
+  labWork LabWork         @relation(fields: [labWorkId], references: [id])
+  members LabTeamMember[]
+}
+
+model LabTeamMember {
+  id        Int @id @default(autoincrement())
+  teamId    Int
+  studentId Int
+
+  team    LabTeam @relation(fields: [teamId], references: [id])
+  student User    @relation(fields: [studentId], references: [id])
+
+  @@unique([teamId, studentId])
+}
